@@ -1,123 +1,184 @@
-# AKOKA
+# AKOKA — The Intelligence Layer for Campus Commerce (UNILAG)
 
-AKOKA is a SvelteKit campus commerce frontend for price comparison, vendor discovery, documented agreements, and moderation. The frontend is prepared to connect to an AKOKA backend. The fintech provider must be integrated by that backend; provider credentials must never be exposed in browser code.
+> **Hackathon MVP Concept & Technical Implementation**  
+> Initial Market: University of Lagos (UNILAG) & Akoka Campus Axis  
+> Core Promise: Compare prices, find trustworthy providers, and document transactions with clear expectations.
 
-## How the app is meant to work
+---
 
-1. A student browses comparable campus listings and verified price observations, then reviews the category, unit, location, source, sample count, confidence, and available price trend.
-2. A student submits a recent price observation. It enters the moderation workflow; it should affect trusted price summaries only after backend verification.
-3. A student signs in, drafts an agreement with a vendor, and records price, scope, deliverables, turnaround, due date, milestones, and cancellation terms.
-4. Both parties progress the agreement. The buyer can start a payment through the backend only after the agreement is accepted. The backend creates the provider checkout session and reports its verified status to the frontend.
-5. The vendor records work and deliverables. The student confirms completion or raises an issue; either party can cancel while the agreement is awaiting acceptance. Later cancellation/payment outcomes follow backend policy. Reports and evidence go to authorized moderators.
-6. Vendors manage their offers and agreements in their portal. Moderators review reports, observations, and listings in the admin portal.
+## 1. Project Organization
 
-Payment status in the UI is informational and comes from the backend. AKOKA does not claim to hold funds or provide escrow. See the [BMONI Nigeria API documentation](https://embedded-docs.bmoni.com/markets/nigeria/); the backend team must decide and implement the provider-side flow and expose an AKOKA API contract.
-
-## Current frontend feature inventory
-
-| Area | Frontend status | Backend / integration dependency |
-| --- | --- | --- |
-| Landing page, category/listing discovery, campus zones, vendor profiles | Implemented | Live listing/vendor data requires configured API |
-| Like-for-like price comparison, confidence, observation history chart | Implemented; chart uses real observation dates and does not invent trend points | Live verified observations and insight calculations require API data |
-| Observation submission | Form validates and submits to the API; students cannot self-label data as vendor-confirmed, receipt-supported, or transaction-linked | Requires authenticated `POST /price-observations`; receipt attachment for a price observation needs a secure upload contract |
-| Sign-in, registration, sign-out | Pages and API client calls exist; admin is not self-registerable | Backend must implement cookie/session auth routes and return the documented user shape |
-| Role-aware student, vendor, admin layouts | Routes are separated and client-side role gates are present | This is navigation/UI gating only; backend must enforce permissions on every protected endpoint |
-| Student and vendor portal pages | Pages load account data through API services; vendors can create and edit their listings | Vendor account must be linked to a vendor profile and the API must scope results to the signed-in user |
-| Agreements, milestones, evidence, cancellation, disputes | Forms/actions call the API; cancellation is available while awaiting acceptance | Backend must implement authorized agreement, milestone, evidence, event, cancellation, and report endpoints and enforce valid state transitions |
-| Payment checkout | Checkout handoff/status client exists at `/payments/checkout` and `/payments/:id`; only the signed-in buyer can start it in the UI | These endpoints are contracts for the AKOKA backend, not BMONI calls. Backend must validate the buyer/agreement, create provider checkout, verify callbacks/webhooks, and return status. No provider secret belongs in this app. |
-| Transaction-verified reviews | Buyer can submit a 1–5 rating and comment after a completed transaction | Backend must enforce completed-transaction eligibility, one review per transaction, and return `review_submitted` on transaction reads |
-| Admin moderation | Queue and moderation controls call the API | Backend must provide admin-authenticated moderation queue and mutation endpoints and enforce admin permissions |
-| Toasts and form feedback | Existing forms show validation, success, and error messages | Server validation and stable error response format are required for connected mode |
-
-The frontend contains no seeded catalog or transaction data and does not fall back to local writes. When `PUBLIC_API_BASE_URL` is unset, API requests fail with a clear configuration error and the UI shows an error or empty state; real data and successful mutations require the backend. Sign-in, registration, payment, and secure evidence upload require the backend routes below. The payment screen is intended for the real fintech checkout flow through the AKOKA backend; payment completion must be confirmed by the backend after provider verification, never by a browser redirect alone.
-
-## Routes and access
-
-| Route | Intended access |
-| --- | --- |
-| `/`, `/compare`, `/listings`, `/vendors/:id` | Public discovery |
-| `/sign-in`, `/register` | Public; registration permits student/vendor only |
-| `/student` | Student portal |
-| `/vendor` | Vendor portal |
-| `/transactions`, `/transactions/:id` | Signed-in student/vendor |
-| `/admin` | Admin/moderator |
-
-The `RequireRole` component improves the frontend experience but is not a security boundary. The backend must authorize users and records independently. `GET /transactions` must return only records the authenticated user may access (or enforce equivalent server-side scoping); client-side filtering is not access control.
-
-## Backend API contract to agree
-
-Set `PUBLIC_API_BASE_URL` to the **AKOKA backend** origin/base path, not the BMONI provider URL. The current client expects JSON, cookie credentials, and errors with `message` or `error` fields. Confirm and adapt these paths/payloads with the backend team before integration:
+This repository is structured into two dedicated workspaces:
 
 ```text
-GET    /auth/me
-POST   /auth/login                   { email, password }
-POST   /auth/register                { name, email, password, role, phone?, campus_zone? }
-POST   /auth/logout
-
-GET    /categories
-GET    /listings                     ?category=&area=&maxPrice=&search=
-GET    /listings/:id
-POST   /listings                    vendor session creates listing
-PATCH  /listings/:id                owning vendor edits listing
-GET    /vendors
-GET    /vendors/:id
-GET    /vendors/:id/reviews
-GET    /price-insights               ?category=&itemSpec=
-GET    /price-observations            ?category=
-POST   /price-observations
-POST   /reports                      target_type: listing, price_observation, transaction, vendor, or review
-GET    /transactions
-POST   /transactions                 buyer identity comes from authenticated session
-GET    /transactions/:id
-PATCH  /transactions/:id/agreement
-GET    /transactions/:id/events
-POST   /transactions/:id/events
-PATCH  /transactions/:id/milestones/:milestoneId
-POST   /transactions/:id/evidence    multipart form: file, title
-POST   /transactions/:id/review      { rating, comment }; buyer only, completed transaction only
-
-GET    /admin/moderation-queue
-PATCH  /admin/moderation-queue/observation/:id
-PATCH  /admin/moderation-queue/report/:id
-
-POST   /payments/checkout             { transaction_id, return_url }; returns { id, status, checkout_url }
-GET    /payments/:paymentId
+Bmoni-Hack-/
+├── akoka-frontend/         # SvelteKit 3 / Svelte 5 + Tailwind CSS v4 frontend
+│   ├── src/                # Public discovery, compare, transactions & portals
+│   ├── .env                # Configured with PUBLIC_API_BASE_URL=http://localhost:5000/api
+│   └── package.json        # Frontend scripts and dependencies
+│
+├── akoka-backend/          # Node.js + Express + TypeScript + MongoDB backend API
+│   ├── src/
+│   │   ├── db/             # MongoDB connection (serverless cached) & Mongoose models
+│   │   ├── middleware/     # JWT cookie auth & secure evidence upload
+│   │   ├── routes/         # Auth, Categories, Listings, Vendors, Insights, Transactions, Payments, Admin
+│   │   ├── services/       # Price intelligence engine & transaction state machine
+│   │   └── server.ts       # Express server entry point
+│   ├── api/index.ts        # Vercel Serverless Function entry point
+│   ├── vercel.json         # Vercel routing configuration
+│   ├── uploads/            # Evidence attachments storage
+│   ├── .env                # Server configuration (PORT=5000, MONGODB_URI, JWT_SECRET, etc.)
+│   └── package.json        # Backend scripts and dependencies
+│
+├── package.json            # Root monorepo orchestration scripts
+└── README.md               # Main project documentation
 ```
 
-After provider checkout, the backend should return the browser to the supplied `return_url` with `payment_id` in the query string. The frontend then calls `GET /payments/:paymentId` and displays only the status returned by the backend. The backend must verify provider callbacks/webhooks and the payment’s transaction ownership before returning `succeeded`.
+---
 
-These are the current frontend endpoint assumptions; confirm and adapt them with the backend developer. Responses are expected as raw JSON objects/arrays, not `{ data: ... }` envelopes. `GET /vendors/:id` returns `{ vendor, listings, reviews }`. The moderation queue returns `{ pendingObservations, reports, pendingTransactions, verifiedObservationCount? }`. Transaction responses include the vendor account owner ID as `vendor.user_id` and buyer-specific `review_submitted` state. The frontend sends evidence as multipart form data. The backend must derive buyer/reporter/actor/vendor identity from the authenticated session rather than trusting IDs supplied by the browser, scope reads, enforce listing ownership and review eligibility, and verify provider webhooks/callbacks before marking payment successful. Never trust a browser redirect as proof of payment.
+## 2. Quick Start (Local Development)
 
-## Local setup
+### Prerequisites
+- Node.js `v22.x` and `npm`
+- MongoDB (Local instance or MongoDB Atlas connection string)
 
-```sh
+### Step 1: Configure Backend Environment
+In `akoka-backend/.env`:
+```env
+PORT=5000
+NODE_ENV=development
+MONGODB_URI=mongodb://localhost:27017/akoka
+# Or MongoDB Atlas: mongodb+srv://<username>:<password>@cluster0.xxx.mongodb.net/akoka?retryWrites=true&w=majority
+FRONTEND_URLS=http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173
+JWT_SECRET=akoka_super_secret_jwt_key_unilag_2026_hackathon
+COOKIE_SECRET=akoka_super_secret_cookie_key_unilag
+PAYMENT_MODE=simulated
+```
+
+### Step 2: Start the Backend API
+```bash
+cd akoka-backend
 npm install
 npm run dev
 ```
+The backend starts on `http://localhost:5000`. On first connection, it automatically connects to MongoDB and seeds realistic UNILAG campus providers, categories, price observations, and transactions.
 
-Create `.env` or `.env.local` with the backend base URL when available:
+### Step 3: Start the Frontend App
+```bash
+cd akoka-frontend
+npm install
+npm run dev
+```
+The frontend starts on `http://localhost:5173`.
 
-```env
-PUBLIC_API_BASE_URL=http://localhost:4000
+Alternatively, from the repository root:
+```bash
+npm run dev:backend     # Runs backend on port 5000
+npm run dev:frontend    # Runs frontend on port 5173
 ```
 
-For local integration, the backend developer can allow the frontend origin `http://localhost:5173`. Share the final hosted frontend origin with them before production release so they can configure CORS and any required payment return URL allowlist. You do not need a hosted frontend URL to begin local integration.
+---
 
-`PUBLIC_` values are shipped to the browser. Put only the AKOKA backend URL here; do not put BMONI API keys, secrets, or signing credentials in frontend environment variables.
+## 3. Deploying to Vercel
 
-## Project structure
+Both the frontend and backend are pre-configured for seamless deployment to Vercel.
 
-Tailwind CSS v4 is compiled locally by the Vite plugin; the UI uses the free Hugeicons Svelte package with per-icon imports. Price charts are rendered by project components without a separate chart dependency. Plus Jakarta Sans and JetBrains Mono are currently loaded from Google Fonts, with system-font fallbacks.
+### Option A: Two Vercel Projects (Recommended)
 
+#### 1. Deploy the Backend (`akoka-backend`)
+1. On the Vercel Dashboard, click **Add New** → **Project**.
+2. Select the repository and set **Root Directory** to `akoka-backend`.
+3. Framework Preset: **Other**.
+4. In **Environment Variables**, add:
+   - `MONGODB_URI`: `mongodb+srv://<user>:<password>@cluster0.xxx.mongodb.net/akoka?retryWrites=true&w=majority`
+   - `JWT_SECRET`: your secret string
+   - `COOKIE_SECRET`: your cookie secret string
+   - `NODE_ENV`: `production`
+   - `PAYMENT_MODE`: `simulated`
+   - `FRONTEND_URLS`: `https://your-akoka-frontend.vercel.app` (or leave default; Vercel URLs are automatically allowed)
+5. Click **Deploy**. Note the assigned backend URL (e.g. `https://akoka-backend.vercel.app`).
+
+#### 2. Deploy the Frontend (`akoka-frontend`)
+1. On Vercel, click **Add New** → **Project**.
+2. Select the repository and set **Root Directory** to `akoka-frontend`.
+3. Framework Preset: **SvelteKit** (detected automatically).
+4. In **Environment Variables**, add:
+   - `PUBLIC_API_BASE_URL`: `https://akoka-backend.vercel.app/api` (using your backend URL from step 1)
+5. Click **Deploy**.
+
+---
+
+## 4. Seeded Demo Accounts (Pre-loaded)
+
+To test the application across all roles during hackathon evaluation:
+
+| Role | Email | Password | Details |
+| :--- | :--- | :--- | :--- |
+| **Student** | `student@unilag.edu.ng` | `password123` | Tunde Bakare (New Hall) — can compare prices, submit observations, draft agreements, and sign off deliverables |
+| **Student** | `chioma@unilag.edu.ng` | `password123` | Chioma Eze (Moremi / Amina Hall) |
+| **Vendor** | `vendor@unilag.edu.ng` | `password123` | Madam Ngozi (Finbarr & CITS Academic Print Hub) — can manage listings, update milestones, and submit deliverable evidence |
+| **Vendor (Tech)** | `repairs@unilag.edu.ng` | `password123` | Engr. Segun Adeyemi (New Hall Tech Clinic) |
+| **Vendor (Laundry)**| `laundry@unilag.edu.ng` | `password123` | Ibrahim Bello (Akoka Swift Wash & Dry Depot) |
+| **Admin** | `admin@akoka.unilag.edu.ng` | `admin123` | Campus Trust & Safety Desk — can audit incoming price observations, resolve reports, and inspect disputes |
+
+---
+
+## 5. Key Architectural Implementations
+
+### Price Intelligence Engine (Section 7 of Spec)
+- **Comparability:** Normalizes pricing for like-for-like specifications (e.g., A4 Monochrome 80gsm vs. Full Colour Plate vs. Hardcover Gold Embossing).
+- **Explainable Confidence Indicator:**
+  - `High`: $\ge 5$ observations within 14 days and coefficient of variation $\le 25\%$ with vendor/receipt confirmation.
+  - `Moderate`: $\ge 3$ observations within 30 days and coefficient of variation $\le 40\%$.
+  - `Low`: Wide price disparity or older data.
+  - `Insufficient Data`: $< 3$ observations (median and range are withheld to avoid inventing unverified claims).
+- **Trend Detection:** Evaluates chronological price dispersion and labels movement (`stable`, `increasing`, `decreasing`, `volatile`).
+
+### Protected Transaction State Machine (Section 8 of Spec)
 ```text
-src/lib/api/             typed frontend API clients
-src/lib/components/      reusable auth, navigation, insight, transaction, report, icon, and UI components
-src/lib/data/            static campus zone reference labels
-src/lib/stores/          authenticated user state and notifications
-src/lib/types/           shared frontend models
-src/routes/              SvelteKit pages
+[Draft] ──> [Awaiting Agreement] ──> [Agreed] ──> [In Progress] ──> [Awaiting Confirmation] ──> [Completed]
+                     │                    │              │                      │
+                     └── [Cancelled]      └──────────────┴──────────────────────┴──> [Disputed]
 ```
+- **Mutual Agreement:** Price, deliverables, turnaround description, and cancellation terms are documented before payment.
+- **Evidence Attachments:** Vendors upload JPG/PNG/PDF proofs (up to 10MB) before requesting student sign-off.
+- **Simulated Payment Gateway:** Conforms to the BMONI Nigeria API integration pattern. Generates a secure checkout session URL that updates transaction state upon verification callback.
 
-## Validation
+### Campus Safety & Moderation Desk (Section 11 of Spec)
+- User submissions enter a pending moderation queue before affecting trusted public price medians.
+- Reports against listings, transactions, or reviews are triaged by administrators with resolution tracking.
 
-Run `npm run check` and `npm run build` before handoff. The project reports zero Svelte/TypeScript diagnostics; SvelteKit still emits configuration notices about the legacy alias setup.
+---
+
+## 6. API Reference Summary
+
+All routes are mounted under `/api` (and at root `/`):
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/login` | Session login with HTTP-only cookie | None |
+| `POST` | `/api/auth/register` | Register student or vendor account | None |
+| `GET` | `/api/auth/me` | Fetch active authenticated user | Yes |
+| `POST` | `/api/auth/logout` | Clear session cookie | Yes |
+| `GET` | `/api/categories` | List active campus categories | None |
+| `GET` | `/api/listings` | Filter listings by category, zone, price, query | None |
+| `POST` | `/api/listings` | Vendor creates new offer | Vendor |
+| `PATCH`| `/api/listings/:id` | Vendor updates listing | Vendor (Owner) |
+| `GET` | `/api/vendors` | List campus vendor profiles | None |
+| `GET` | `/api/vendors/:id` | Vendor profile + listings + reviews | None |
+| `GET` | `/api/price-insights` | Calculate benchmark, range, and confidence | None |
+| `GET` | `/api/price-observations`| Fetch verified observations | None |
+| `POST` | `/api/price-observations`| Submit new campus price | Authenticated |
+| `GET` | `/api/transactions` | List scoped user agreements | Authenticated |
+| `POST` | `/api/transactions` | Student drafts transaction agreement | Student |
+| `GET` | `/api/transactions/:id` | Get agreement details & milestone progress | Parties / Admin |
+| `PATCH`| `/api/transactions/:id/agreement` | Transition agreement status | Parties / Admin |
+| `PATCH`| `/api/transactions/:id/milestones/:id` | Toggle milestone completion | Vendor |
+| `POST` | `/api/transactions/:id/evidence` | Upload deliverable evidence (multipart) | Vendor |
+| `POST` | `/api/transactions/:id/review` | Submit verified review on completion | Buyer |
+| `POST` | `/api/payments/checkout` | Create payment checkout session | Buyer |
+| `GET` | `/api/payments/:id` | Check verified payment status | Authenticated |
+| `POST` | `/api/reports` | Report listing, review, or dispute | Authenticated |
+| `GET` | `/api/admin/moderation-queue` | Admin audit queue | Admin |
+| `PATCH`| `/api/admin/moderation-queue/observation/:id` | Verify/reject price observation | Admin |
+| `PATCH`| `/api/admin/moderation-queue/report/:id` | Resolve/dismiss report | Admin |
