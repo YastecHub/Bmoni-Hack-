@@ -3,6 +3,9 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"engines": {
+		"node": ">=20.0.0"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
@@ -12,7 +15,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^8.0.0",
+		"@sveltejs/adapter-vercel": "^7.0.1",
 		"@sveltejs/kit": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.2.0",
 		"@tailwindcss/vite": "^4.3.3",
@@ -30,7 +33,6 @@
 	},
 	"dependencies": {
 		"@hugeicons/core-free-icons": "^4.3.5",
-		"@hugeicons/svelte": "^1.1.5",
-		"@rolldown/binding-win32-x64-msvc": "^1.2.14"
+		"@hugeicons/svelte": "^1.1.5"
 	}
 }

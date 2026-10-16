@@ -7,6 +7,10 @@
     "dev:frontend": "npm run dev --prefix akoka-frontend",
     "build:backend": "npm run build --prefix akoka-backend",
     "build:frontend": "npm run build --prefix akoka-frontend",
-    "seed:backend": "npm run seed --prefix akoka-backend"
+    "seed:backend": "npm run seed --prefix akoka-backend",
+    "deploy:backend": "cd akoka-backend && vercel",
+    "deploy:frontend": "cd akoka-frontend && vercel",
+    "deploy:backend:prod": "cd akoka-backend && vercel --prod",
+    "deploy:frontend:prod": "cd akoka-frontend && vercel --prod"
   }
 }
