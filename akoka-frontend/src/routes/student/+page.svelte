@@ -1,15 +1,35 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/authStore';
 	import { fetchTransactions } from '$lib/api/transactions';
 	import { fetchObservations } from '$lib/api/insights';
-	import { apiClient } from '$lib/api/client';
+	import { apiClient, getStoredToken } from '$lib/api/client';
 	import { IconFileText, IconTagPrice, IconMapPin, IconArrowRight } from '$lib/components/icons';
+
 	const user = authStore;
 	let transactions = $state<import('$lib/types/models').Transaction[]>([]);
 	let verifiedPrices = $state(0);
 	let loadError = $state('');
-	onMount(async () => { try { const [tx, observations] = await Promise.all([fetchTransactions(), fetchObservations()]); transactions = tx; verifiedPrices = observations.filter((item) => item.verification_status === 'verified').length; } catch (error) { loadError = error instanceof Error ? error.message : 'Could not load account data.'; } });
+	let loading = $state(true);
+
+	onMount(async () => {
+		if (!getStoredToken() && !$user) {
+			await goto('/sign-in?returnTo=/student');
+			return;
+		}
+
+		try {
+			const [tx, observations] = await Promise.all([fetchTransactions(), fetchObservations()]);
+			transactions = tx;
+			verifiedPrices = observations.filter((item) => item.verification_status === 'verified').length;
+		} catch (error) {
+			loadError = error instanceof Error ? error.message : 'Could not load account data.';
+		} finally {
+			loading = false;
+		}
+	});
+
 	const active = $derived(transactions.filter((item) => !['completed', 'cancelled'].includes(item.status)).length);
 </script>
 

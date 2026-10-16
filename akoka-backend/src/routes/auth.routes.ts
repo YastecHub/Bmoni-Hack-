@@ -14,7 +14,12 @@ export const authRouter = Router();
 
 // GET /auth/me
 authRouter.get('/me', requireAuth, (req: AuthRequest, res: Response) => {
-	res.json(req.user);
+	const safeUser: any = { ...req.user };
+	delete safeUser.password_hash;
+	res.json({
+		user: safeUser,
+		...safeUser
+	});
 });
 
 // POST /auth/login
@@ -45,12 +50,17 @@ authRouter.post('/login', async (req: AuthRequest, res: Response) => {
 			return;
 		}
 
-		const user: UserType = userRecord.toJSON();
+		const safeUser: any = userRecord.toJSON();
+		delete safeUser.password_hash;
 
-		const token = generateToken(user);
+		const token = generateToken(safeUser);
 		setAuthCookie(res, token);
 
-		res.json(user);
+		res.json({
+			token,
+			user: safeUser,
+			...safeUser
+		});
 	} catch (error) {
 		console.error('Login error:', error);
 		res.status(500).json({ error: 'Failed to sign in. Please try again.' });
@@ -119,12 +129,17 @@ authRouter.post('/register', async (req: AuthRequest, res: Response) => {
 			});
 		}
 
-		const newUser: UserType = newUserDoc.toJSON();
+		const safeUser: any = newUserDoc.toJSON();
+		delete safeUser.password_hash;
 
-		const token = generateToken(newUser);
+		const token = generateToken(safeUser);
 		setAuthCookie(res, token);
 
-		res.status(201).json(newUser);
+		res.status(201).json({
+			token,
+			user: safeUser,
+			...safeUser
+		});
 	} catch (error) {
 		console.error('Registration error:', error);
 		res.status(500).json({ error: 'Failed to create account.' });

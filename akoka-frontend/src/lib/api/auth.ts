@@ -1,5 +1,5 @@
 import type { User } from '$lib/types/models';
-import { apiClient } from './client';
+import { apiClient, setStoredToken, getStoredToken } from './client';
 
 export interface RegisterPayload {
 	name: string;
@@ -10,22 +10,49 @@ export interface RegisterPayload {
 	campus_zone?: string;
 }
 
-function unwrapUser(payload: User | { user: User }): User {
-	return 'user' in payload ? payload.user : payload;
+export interface AuthResponse {
+	user?: User;
+	token?: string;
+	id?: string;
+	email?: string;
+	role?: 'student' | 'vendor' | 'admin';
+	display_name?: string;
+	[key: string]: any;
+}
+
+function unwrapUser(payload: any): User {
+	if (!payload) {
+		throw new Error('Empty response received from authentication service.');
+	}
+
+	if (payload.token) {
+		setStoredToken(payload.token);
+	}
+
+	return payload.user ? payload.user : payload;
 }
 
 export async function signIn(email: string, password: string): Promise<User> {
-	return unwrapUser(await apiClient.post<User | { user: User }>('/auth/login', { email, password }));
+	const res = await apiClient.post<AuthResponse>('/auth/login', { email, password });
+	return unwrapUser(res);
 }
 
 export async function registerAccount(data: RegisterPayload): Promise<User> {
-	return unwrapUser(await apiClient.post<User | { user: User }>('/auth/register', data));
+	const res = await apiClient.post<AuthResponse>('/auth/register', data);
+	return unwrapUser(res);
 }
 
 export async function fetchCurrentUser(): Promise<User> {
-	return unwrapUser(await apiClient.get<User | { user: User }>('/auth/me'));
+	const res = await apiClient.get<AuthResponse>('/auth/me');
+	return unwrapUser(res);
 }
 
 export async function signOut(): Promise<void> {
-	await apiClient.post<void>('/auth/logout');
+	try {
+		await apiClient.post<void>('/auth/logout');
+	} finally {
+		setStoredToken(null);
+	}
 }
+
+export { getStoredToken };

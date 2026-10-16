@@ -6,7 +6,7 @@
 	import SubmitObservationModal from '$lib/components/insights/SubmitObservationModal.svelte';
 	import { onMount } from 'svelte';
 	import { apiClient } from '$lib/api/client';
-	import { fetchCurrentUser } from '$lib/api/auth';
+	import { fetchCurrentUser, getStoredToken } from '$lib/api/auth';
 	import { clearAuthenticatedUser, setAuthenticatedUser } from '$lib/stores/authStore';
 
 	let { children } = $props();
@@ -21,9 +21,16 @@
 		isSubmitModalOpen = false;
 	}
 
-	onMount(() => {
+	onMount(async () => {
 		if (!apiClient.backendConfigured) return;
-		fetchCurrentUser().then(setAuthenticatedUser).catch(clearAuthenticatedUser);
+		if (getStoredToken()) {
+			try {
+				const user = await fetchCurrentUser();
+				setAuthenticatedUser(user);
+			} catch {
+				clearAuthenticatedUser();
+			}
+		}
 	});
 </script>
 

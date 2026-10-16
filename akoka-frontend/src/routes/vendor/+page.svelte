@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { authStore } from '$lib/stores/authStore';
-	import { apiClient } from '$lib/api/client';
+	import { apiClient, getStoredToken } from '$lib/api/client';
 	import { createListing, fetchListings, updateListing, type ListingInput } from '$lib/api/listings';
 	import { fetchCategories } from '$lib/api/categories';
 	import { fetchVendors } from '$lib/api/vendors';
@@ -38,7 +39,14 @@
 		categories = categoryData;
 		if (!categoryId) categoryId = categoryData[0]?.id ?? '';
 	}
-	onMount(() => { loadPortal().catch((error) => loadError = error instanceof Error ? error.message : 'Could not load vendor account.'); });
+
+	onMount(async () => {
+		if (!getStoredToken() && !$user) {
+			await goto('/sign-in?returnTo=/vendor');
+			return;
+		}
+		loadPortal().catch((error) => loadError = error instanceof Error ? error.message : 'Could not load vendor account.');
+	});
 
 	function editListing(listing: Listing) {
 		editingId = listing.id; categoryId = listing.category_id; title = listing.title; description = listing.description;

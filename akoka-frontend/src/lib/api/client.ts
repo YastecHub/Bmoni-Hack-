@@ -12,6 +12,30 @@ const resolvedBaseUrl =
 		(import.meta.env?.PUBLIC_API_BASE_URL || import.meta.env?.VITE_PUBLIC_API_BASE_URL)) ||
 	defaultBaseUrl;
 
+export const TOKEN_STORAGE_KEY = 'akoka_token';
+
+export function getStoredToken(): string | null {
+	if (typeof window === 'undefined') return null;
+	try {
+		return localStorage.getItem(TOKEN_STORAGE_KEY);
+	} catch {
+		return null;
+	}
+}
+
+export function setStoredToken(token: string | null): void {
+	if (typeof window === 'undefined') return;
+	try {
+		if (token) {
+			localStorage.setItem(TOKEN_STORAGE_KEY, token);
+		} else {
+			localStorage.removeItem(TOKEN_STORAGE_KEY);
+		}
+	} catch {
+		// Ignore storage quota or security errors
+	}
+}
+
 export interface ApiResponse<T> {
 	success: boolean;
 	data?: T;
@@ -36,14 +60,20 @@ export class ApiClient {
 	private async request<T>(endpoint: string, init: RequestInit = {}): Promise<T> {
 		try {
 			const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+			const token = getStoredToken();
+			const customHeaders = (init.headers || {}) as Record<string, string>;
+
+			const headers: Record<string, string> = {
+				Accept: 'application/json',
+				...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
+				...(token && !customHeaders['Authorization'] ? { Authorization: `Bearer ${token}` } : {}),
+				...customHeaders
+			};
+
 			const response = await fetch(`${this.baseUrl}${cleanEndpoint}`, {
 				...init,
 				credentials: 'include',
-				headers: {
-					Accept: 'application/json',
-					...(init.body && !(init.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
-					...init.headers
-				}
+				headers
 			});
 
 			const text = response.status === 204 ? '' : await response.text();

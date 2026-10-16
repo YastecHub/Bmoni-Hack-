@@ -22,20 +22,30 @@ export function generateToken(user: UserType): string {
 }
 
 export function setAuthCookie(res: Response, token: string): void {
+	const isProd =
+		config.nodeEnv === 'production' ||
+		process.env.NODE_ENV === 'production' ||
+		Boolean(process.env.VERCEL);
+
 	res.cookie('akoka_token', token, {
 		httpOnly: true,
-		secure: config.nodeEnv === 'production',
-		sameSite: 'lax',
+		secure: isProd,
+		sameSite: isProd ? 'none' : 'lax',
 		maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 		path: '/'
 	});
 }
 
 export function clearAuthCookie(res: Response): void {
+	const isProd =
+		config.nodeEnv === 'production' ||
+		process.env.NODE_ENV === 'production' ||
+		Boolean(process.env.VERCEL);
+
 	res.clearCookie('akoka_token', {
 		httpOnly: true,
-		secure: config.nodeEnv === 'production',
-		sameSite: 'lax',
+		secure: isProd,
+		sameSite: isProd ? 'none' : 'lax',
 		path: '/'
 	});
 }
@@ -56,7 +66,9 @@ export async function authenticate(req: AuthRequest, _res: Response, next: NextF
 		const userDoc = await User.findById(decoded.id);
 
 		if (userDoc && userDoc.account_status === 'active') {
-			req.user = userDoc.toJSON();
+			const safeUser = userDoc.toJSON();
+			delete (safeUser as any).password_hash;
+			req.user = safeUser;
 		}
 	} catch {
 		// Invalid or expired token - proceed as unauthenticated

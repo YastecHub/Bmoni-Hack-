@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { fetchModerationQueue, moderateObservation, resolveReport as resolveModerationReport } from '$lib/api/admin';
-	import { apiClient } from '$lib/api/client';
+	import { apiClient, getStoredToken } from '$lib/api/client';
 	import { authStore } from '$lib/stores/authStore';
 	import { toast } from '$lib/stores/notificationStore';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -24,7 +25,13 @@
 	let pageError = $state('');
 	let busy = $state(false);
 	async function refreshQueue() { const queue = await fetchModerationQueue(); pendingObservations = queue.pendingObservations; pendingReports = queue.reports; disputedTransactions = queue.pendingTransactions; verifiedObservationCount = queue.verifiedObservationCount ?? 0; }
-	onMount(() => { refreshQueue().catch((error) => pageError = error instanceof Error ? error.message : 'Could not load moderation queue.'); });
+	onMount(async () => {
+		if (!getStoredToken() && !$currentUser) {
+			await goto('/sign-in?returnTo=/admin');
+			return;
+		}
+		refreshQueue().catch((error) => pageError = error instanceof Error ? error.message : 'Could not load moderation queue.');
+	});
 
 	async function handleVerifyObs(id: string) {
 		await runModeration(() => moderateObservation(id, 'verified'), 'Observation Approved');
